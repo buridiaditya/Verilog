@@ -3,39 +3,41 @@ module testbench();
 	reg clock,reset;
 	integer i = 0;
 	reg status;
-	IR[0] = 16'b0000000000000000;
-	IR[1] = 16'b0000000000000000;
-	IR[2] = 16'b0000000000000000;
-	IR[3] = 16'b0000000000000000;
-	IR[4] = 16'b0000000000000000;
+	reg[15:0] IRout;
 	initial begin
-		status <= 0;
-		clock <= 0;
+		IR[0] = 16'b0000000000000000;
+		IR[1] = 16'b0000000000000000;
+		IR[2] = 16'b0000000000000000;
+		IR[3] = 16'b0000000000000000;
+		IR[4] = 16'b0000000000000000;
+		status = 0;
+		clock = 0;
 	end
 	always begin
 		#5 clock = ~clock;
 	end 
-	always @(posedge ldIR) begin
-		IRout = IR[i];
-		i = i+1;
-	end
-	controller(IRout);
+	// always @(posedge ldIR) begin
+	// 	IRout = IR[i];
+	// 	i = i+1;
+	// end
+	
 endmodule
 
 module controller(
-	IR, status, MFC, reset,
+	IR, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
 	ldPC, ldReg, ldYBuff, ldSP,
-	TPC, TSP, TMAR, TMDR, TDBUS, TReg,
+	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
 	funcSelect, regSelect, read, write
 	);
 
 	input[15:0] IR;
-	input status, MFC, reset;
-	output read, write;
-	output ldMAR, ldMAR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
-	output TPC, TSP, TMAR, TMDR, TDBUS, TReg;
-	output funcSelect, regSelect;
+	input status, MFC, reset, clock;
+	output reg read, write;
+	output reg ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
+	output reg TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
+	output reg[2:0] funcSelect;
+	output reg[2:0] regSelect;
 
 	reg[3:0] state;
 
@@ -77,11 +79,11 @@ module controller(
 						// IDLE
 						state = 5'b00000;
 					end
-					else if( (IR[15:12] == 4'b1111 and IR[11:9] == 3'b000) or (IR[15:12] == 4'b1001) ) begin
+					else if( (IR[15:12] == 4'b1111 && IR[11:9] == 3'b000) || (IR[15:12] == 4'b1001) ) begin
 						// PUSH / CALL
 						state = 5'b01010;
 					end
-					else if( (IR[15:12] == 4'b1111) ) begin
+					else if(IR[15:12] == 4'b1111) begin
 						// POP / RETURN / ALU
 						state = 5'b00100;
 					end
@@ -106,7 +108,7 @@ module controller(
 					state = 5'b00110;
 				end
 				5'b00110: begin
-					if(MFC = 1) begin
+					if(MFC == 1) begin
 						TDBUS = 1;
 						ldMDR = 1;
 						TSP = 1;
@@ -125,23 +127,23 @@ module controller(
 				////////////////////////////////// ALU //////////////////////////////////
 				5'b01000: begin
 					TMDR = 1;
-					if(IR[15:12] == 4'b1111 and IR[11:9] == 3'b110) begin
+					if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b110) begin
 						// RETURN
 						funcSelect = 3'b000;
 					end
-					else if(IR[15:12] == 4'b1111 and IR[11:9] == 3'b001) begin
+					else if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b001) begin
 						// POP
 						funcSelect = 3'b000;
 						TMDR = 0;
 						regSelect = IR[8:6];
 					end
-					else if(IR[15:12] == 4'b1111 and (IR[11:9] == 3'b011 or IR[11:9] == 3'b101) ) begin
+					else if(IR[15:12] == 4'b1111 && (IR[11:9] == 3'b011 || IR[11:9] == 3'b101) ) begin
 						// NEG or NOT
 						funcSelect = IR[11:9];
 						TMDR = 0;
 						regSelect = IR[8:6];
 					end
-					else if(IR[15:12] == 4'b1111 and (IR[11:9] == 3'b100 or IR[11:9] == 3'b010) ) begin
+					else if(IR[15:12] == 4'b1111 && (IR[11:9] == 3'b100 || IR[11:9] == 3'b010) ) begin
 						// ADD or OR
 						ldYBuff = 1;
 						ldYBuff = 0;
@@ -153,7 +155,7 @@ module controller(
 					state = 5'b01001;
 				end
 				5'b01001: begin
-					if(IR[15:12] == 4'b1111 and IR[11:9] == 3'b110) begin
+					if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b110) begin
 						// RETURN
 						ldPC = 1;
 						ldPC = 0;
@@ -184,12 +186,12 @@ module controller(
 					ldMAR = 0;
 					TSP = 0;
 					TMAR = 1;
-					if(IR[15:12] == 4'b1111 and IR[11:9] == 3'b000) begin
+					if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b000) begin
 						// PUSH 
 						regSelect = IR[8:6]; 
 						TReg = 1;
 					end 
-					else if(IR[15:12] == 4'b1001) )begin
+					else if( IR[15:12] == 4'b1001 ) begin
 						// CALL
 						TPC = 1;
 					end
@@ -209,11 +211,11 @@ module controller(
 					if(MFC == 1) begin
 						TDBUS = 0;
 						write = 0;
-						if(IR[15:12] == 4'b1111 and IR[11:9] == 3'b000) begin
+						if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b000) begin
 							// PUSH 
 							state = 5'b00000;
 						end 
-						else if(IR[15:12] == 4'b1001) )begin
+						else if(IR[15:12] == 4'b1001) begin
 							// CALL
 							state = 5'b01111;
 						end
