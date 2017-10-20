@@ -1,26 +1,46 @@
 module testbench();
 	reg[15:0] IR[0:4];
-	reg clock,reset;
 	integer i = 0;
-	reg status;
 	reg[15:0] IRout;
+
+	reg status, MFC, reset, clock;
+	wire read, write;
+	wire ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
+	wire TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
+	wire[2:0] funcSelect;
+	wire[2:0] regSelect;
+
 	initial begin
-		IR[0] = 16'b0000000000000000;
+		$dumpfile ("shifter.vcd");
+		$dumpvars;
+		IR[0] = 16'b1111010001000000;
 		IR[1] = 16'b0000000000000000;
 		IR[2] = 16'b0000000000000000;
 		IR[3] = 16'b0000000000000000;
 		IR[4] = 16'b0000000000000000;
 		status = 0;
 		clock = 0;
+		#5 reset = 1;
+		#10 reset = 0;
+		#9 MFC = 1;
+		#3 MFC = 0;
+		#20 MFC = 1;
+		#27 MFC = 0;
 	end
 	always begin
 		#5 clock = ~clock;
 	end 
-	// always @(posedge ldIR) begin
-	// 	IRout = IR[i];
-	// 	i = i+1;
-	// end
-	
+	always @(posedge ldIR) begin
+		IRout = IR[i];
+		i = i+1;
+	end
+	controller a(
+	IRout, status, MFC, reset, clock,
+	ldMAR, ldMDR, ldIR, 
+	ldPC, ldReg, ldYBuff, ldSP,
+	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
+	funcSelect, regSelect, read, write
+	);
 endmodule
 
 module controller(
@@ -44,6 +64,23 @@ module controller(
 	always @(posedge clock or negedge clock) begin
 		if (reset == 1) begin
 			state = 5'b00000;
+			read = 0;
+			write = 0;
+			ldMAR = 0;
+			ldMDR = 0;
+			ldIR = 0;
+			ldPC = 0;
+			ldReg = 0;
+			ldYBuff = 0;
+			ldSP = 0;
+			TPC = 0;
+			TSP = 0;
+			TMAR = 0;
+			TMDR = 0;
+			TDBUS = 0;
+			TReg = 0;
+			TALU = 0;
+			TIR = 0;
 		end
 		else begin
 			case(state)
