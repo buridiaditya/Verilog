@@ -33,7 +33,7 @@ module controller(
 	input[15:0] IR;
 	input status, MFC, reset;
 	output read, write;
-	output ldMAR, ldMAR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
+	output ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
 	output TPC, TSP, TMAR, TMDR, TDBUS, TReg;
 	output funcSelect, regSelect;
 
