@@ -13,11 +13,12 @@ module testbench();
 	initial begin
 		$dumpfile ("shifter.vcd");
 		$dumpvars;
-		IR[0] = 16'b1111010001000000;
-		IR[1] = 16'b0000000000000000;
-		IR[2] = 16'b0000000000000000;
-		IR[3] = 16'b0000000000000000;
-		IR[4] = 16'b0000000000000000;
+		IR[0] = 16'b1111010001000000;	// add
+		IR[1] = 16'b1111010001000000;	// pop
+		IR[2] = 16'b1111011010000000;	// neg
+		IR[3] = 16'b1111000010000000;	// push
+		IR[4] = 16'b1010000000000000;	// idle
+		IRout = IR[0];
 		status = 0;
 		clock = 0;
 		#5 reset = 1;
@@ -33,6 +34,8 @@ module testbench();
 	always @(posedge ldIR) begin
 		IRout = IR[i];
 		i = i+1;
+		if(i > 4)
+			i = 4;
 	end
 	controller a(
 	IRout, status, MFC, reset, clock,
@@ -48,7 +51,7 @@ module controller(
 	ldMAR, ldMDR, ldIR, 
 	ldPC, ldReg, ldYBuff, ldSP,
 	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
-	funcSelect, regSelect, read, write
+	funcSelect, regSelect, statusSelect, read, write
 	);
 
 	input[15:0] IR;
@@ -58,6 +61,7 @@ module controller(
 	output reg TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
 	output reg[2:0] funcSelect;
 	output reg[2:0] regSelect;
+	output reg[3:0] statusSelect;
 
 	reg[3:0] state;
 
@@ -101,6 +105,7 @@ module controller(
 				5'b00010: begin
 					if(MFC == 1) begin
 						ldIR = 1;
+						ldIR = 0;
 						TMAR = 0;
 						read = 0;
 						TPC = 1;
@@ -261,12 +266,17 @@ module controller(
 				/////////////////////////////////////////////////////////////////////////
 				//////////////////////////////// PC UPDATE //////////////////////////////
 				5'b01111: begin
-					TIR = 1;
-					ldYBuff = 1;
-					TIR = 0;
-					TPC = 1;
-					funcSelect = 3'b010;
-					state = 5'b10000;
+					statusSelect = IR[15:12];
+					if(IR[15:12] == 1001 || status == 1) begin
+						TIR = 1;
+						ldYBuff = 1;
+						TIR = 0;
+						TPC = 1;
+						funcSelect = 3'b010;
+						state = 5'b10000;
+					end
+					else 
+						state = 5'b00000;
 				end
 				5'b10000: begin
 					ldPC = 1;
