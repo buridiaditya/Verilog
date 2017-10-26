@@ -294,6 +294,36 @@ module controller(
 	end
 endmodule
 
+module datapath(ldSP,TSP,ldPC,TPC,RegSel,TReg,Rdreg,Wreg,FnSelect,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,ldMAR,ldflg,
+                CondSelect,status,IR,reset);
+input ldSP,TSP,ldPC,TPC,TReg,Rdreg,Wreg,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,ldMAR,ldflg,reset;
+input [2:0] RegSel;
+input [2:0] FnSelect;
+input [3:0] CondSelect;
+output status;
+output [15:0] IR;
+
+wire [15:0] INBUS;
+wire [15:0] OUTBUS;
+wire [15:0] Osp;
+wire [15:0] Opc;
+wire [15:0] Oregbank;
+
+register16bit SP(Osp,OUTBUS,1,reset,ldSP);
+triStateBuffer BuffSP(TSP,Osp,INBUS);
+
+register16bit PC(Opc,OUTBUS,1,reset,ldPC);
+triStateBuffer BuffPC(TPC,Opc,INBUS);
+
+endmodule
+
+module triStateBuffer(enable,inp,out);
+    input[15:0] inp;
+    input enable;
+    output[15:0] out;
+    assign out = enable?inp:'bz;
+endmodule
+
 module register16bit(out, in, e, reset, clock);
     output [15:0] out;
     input [15:0] in;
@@ -394,7 +424,7 @@ module mux8to1(a,sel,out);
   input [7:0] a;
   input [2:0] sel;
   output out;
-  wire mux[2:0];
+  wire [2:0] mux;
  
   mux4to1 m1 (a[7:4],sel[1:0],mux[1]),
   m2 (a[3:0],sel[1:0],mux[0]);
@@ -420,8 +450,9 @@ input [15:0] x;
 input [15:0] y;
 output [15:0] z;
 input [2:0] f;
-output wire cy;
-output wire cym1;
+output reg cy;
+output reg cym1;
+
 
 wire [15:0] incr;
 wire [15:0] orop;
@@ -501,4 +532,77 @@ module DFF(out, in, e, reset, clock);
     assign out = mem;
 endmodule
 
-//module statusDetect(cy,cym1)
+module statusDetect(cy,cym1,out,z,nz,v,nv,c,nc,s,ns,ldflg,reset);
+input cy;
+input cym1;
+input [15:0] out;
+input reset;
+input ldflg;
+output z,nz,v,nv,c,nc,s,ns;
+
+wire zeroout,vout;
+zero_detector zd(out,zeroout);
+xor(vout,cy,cym1);
+
+DFF dz(z,zeroout,1,reset,ldflg);
+DFF dv(v,vout,1,reset,ldflg);
+DFF dc(c,cy,1,reset,ldflg);
+DFF ds(s,out[15],1,reset,ldflg);
+
+not(nz,z);
+not(nc,c);
+not(ns,s);
+not(nv,v); 
+endmodule
+
+module zero_detector(z,status);
+    input [15:0] z;
+    output status;
+    wire t12,t34,t56,t78,t910,t1112,t1314,t1516;
+    wire t1234,t5678,t9101112,t13141516;
+    wire ta,tb,tc;
+    or (t12,z[0],z[1]);
+    or (t34,z[2],z[3]);
+    or (t56,z[4],z[5]);
+    or (t78,z[6],z[7]);
+    or (t910,z[8],z[9]);
+    or (t1112,z[10],z[11]);
+    or (t1314,z[12],z[13]);
+    or (t1516,z[14],z[15]);
+    or (t1234,t12,t34);
+    or (t5678,t56,t78);
+    or (t9101112, t910,t1112);
+    or (t13141516, t1314, t1516);
+    or (ta, t1234,t5678);
+    or (tb,t9101112,t13141516);
+    or (tc,ta,tb);
+    not(status,tc);
+endmodule
+
+module mux9to1(a,sel,out);
+  input [8:0] a;
+  input [3:0] sel;
+  output reg out;
+  
+  always @(*) begin
+      if(sel == 4'b0011) begin out = a[8]; end
+      else if(sel == 4'b0100) begin out = a[7]; end
+      else if(sel == 4'b0101) begin out = a[6]; end
+      else if(sel == 4'b0110) begin out = a[5]; end
+      else if(sel == 4'b0001) begin out = a[4]; end
+      else if(sel == 4'b0010) begin out = a[3]; end
+      else if(sel == 4'b0111) begin out = a[2]; end
+      else if(sel == 4'b1000) begin out = a[1]; end
+      else if(sel == 4'b0000) begin out = 1; end
+      else begin out = 0; end
+  end
+endmodule
+
+module statusConditionSelection(z,nz,v,nv,c,nc,s,ns,condition,status);
+input z,nz,v,nv,c,nc,s,ns;
+input [3:0] condition;
+output status;
+
+mux9to1 m({z,nz,v,nv,s,ns,1},condition,status);
+endmodule 
+
