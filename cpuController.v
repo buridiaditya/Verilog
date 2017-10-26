@@ -294,26 +294,60 @@ module controller(
 	end
 endmodule
 
-module datapath(ldSP,TSP,ldPC,TPC,RegSel,TReg,Rdreg,Wreg,FnSelect,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,ldMAR,ldflg,
-                CondSelect,status,IR,reset);
-input ldSP,TSP,ldPC,TPC,TReg,Rdreg,Wreg,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,ldMAR,ldflg,reset;
+module datapath(ldSP,TSP,ldPC,TPC,RegSel,TReg,FnSelect,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,TWrite,ldMAR,ldflg,
+                CondSelect,status,IR,ldReg,reset,ABUS,DBUS);
+input ldSP,TSP,ldPC,TPC,TReg,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,ldMAR,ldflg,ldReg,reset,TWrite;
 input [2:0] RegSel;
 input [2:0] FnSelect;
 input [3:0] CondSelect;
 output status;
 output [15:0] IR;
+output [15:0] ABUS;
+output [15:0] DBUS;
 
 wire [15:0] INBUS;
 wire [15:0] OUTBUS;
 wire [15:0] Osp;
 wire [15:0] Opc;
 wire [15:0] Oregbank;
+wire [15:0] yout;
+wire cy,cym1;
+wire z,nz,v,nv,c,nc,s,ns;
+wire [15:0] marout;
+wire [15:0] tempIR;
+wire [15:0] toMDR;
+wire [15:0] fromMDR;
+
+
+register16bit MAR(marout,OUTBUS,1,reset,ldMAR);
+triStateBuffer BuffMAR(TMAR,marout,ABUS);
+
+register16bit IRreg(IR,DBUS,1,reset,ldIR);
+assign tempIR = {4'b0,IR[11:0]};
+triStateBuffer BuffIR(TIR,tempIR,INBUS);
+
+register16bit MDR(fromMDR ,toMDR,1,reset,ldMDR);
+triStateBuffer(TALU,OUTBUS,toMDR);
+triStateBuffer(TDBus,DBUS,toMDR);
+triStateBuffer(TMDR,fromMDR,INBUS);
+triStateBuffer(TWrite,fromMDR,DBUS);
+
 
 register16bit SP(Osp,OUTBUS,1,reset,ldSP);
 triStateBuffer BuffSP(TSP,Osp,INBUS);
 
 register16bit PC(Opc,OUTBUS,1,reset,ldPC);
 triStateBuffer BuffPC(TPC,Opc,INBUS);
+
+regBank RB(OUTBUS, Oregbank , RegSel,reset,ldReg);
+triStateBuffer BuffRegBank(TReg,Oregbank,INBUS);
+
+register16bit Ybuff(yout,INBUS,1,reset,ldYbuff);
+
+
+ALU(INBUS,yout,OUTBUS,FnSelect,cy,cym1);
+statusDetect(cy,cym1,OUTBUS,z,nz,v,nv,c,nc,s,ns,ldflg,reset);
+statusConditionSelection(z,nz,v,nv,c,nc,s,ns,CondSelect,status);
 
 endmodule
 
@@ -368,11 +402,9 @@ assign e7 = w & (x) & (y) & (~z);
 assign e8 = w & (x) & (y) & (z);
 endmodule
 
-module regBank(dataIn, dataOut, regselect, write, read,reset, clock);
+module regBank(dataIn, dataOut, regselect, reset, clock);
     output [15:0] dataOut;
     input [2:0] regselect;    
-    input write;
-    input read;
     input [15:0] dataIn;
     input reset, clock;
     
@@ -386,7 +418,7 @@ module regBank(dataIn, dataOut, regselect, write, read,reset, clock);
     wire[15:0] out7;
     wire[15:0] out8;
     
-    demultiplexer1_8 demuxwr(write,regselect[2],regselect[1],regselect[0],e1,e2,e3,e4,e5,e6,e7,e8);
+    demultiplexer1_8 demuxwr(clock,regselect[2],regselect[1],regselect[0],e1,e2,e3,e4,e5,e6,e7,e8);
     
     register16bit r1(out1, dataIn, e1, reset, clock);
     register16bit r2(out2, dataIn, e2, reset, clock);
