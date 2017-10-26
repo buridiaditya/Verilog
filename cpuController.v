@@ -6,7 +6,7 @@ module testbench();
 	reg status, MFC, reset, clock;
 	wire read, write;
 	wire ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
-	wire TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
+	wire TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite;
 	wire[2:0] funcSelect;
 	wire[2:0] regSelect;
 
@@ -41,7 +41,7 @@ module testbench();
 	IRout, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
 	ldPC, ldReg, ldYBuff, ldSP,
-	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
+	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite,
 	funcSelect, regSelect, read, write
 	);
 endmodule
@@ -50,7 +50,7 @@ module controller(
 	IR, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
 	ldPC, ldReg, ldYBuff, ldSP, ldFlag,
-	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
+	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite,
 	funcSelect, regSelect, statusSelect, read, write
 	);
 
@@ -58,7 +58,7 @@ module controller(
 	input status, MFC, reset, clock;
 	output reg read, write;
 	output reg ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP, ldFlag;
-	output reg TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
+	output reg TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite;
 	output reg[2:0] funcSelect;
 	output reg[2:0] regSelect;
 	output reg[3:0] statusSelect;
@@ -251,12 +251,12 @@ module controller(
 					ldMDR = 0;
 					TALU = 0;
 					write = 1;
-					TDBUS = 1;
+					TWrite = 1;
 					state = 5'b01110;
 				end
 				5'b01110: begin
 					if(MFC == 1) begin
-						TDBUS = 0;
+						TWrite = 0;
 						write = 0;
 						if(IR[15:12] == 4'b1111 && IR[11:9] == 3'b000) begin
 							// PUSH 
