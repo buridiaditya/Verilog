@@ -49,7 +49,7 @@ endmodule
 module controller(
 	IR, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
-	ldPC, ldReg, ldYBuff, ldSP,
+	ldPC, ldReg, ldYBuff, ldSP, ldFlag,
 	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR,
 	funcSelect, regSelect, statusSelect, read, write
 	);
@@ -57,7 +57,7 @@ module controller(
 	input[15:0] IR;
 	input status, MFC, reset, clock;
 	output reg read, write;
-	output reg ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
+	output reg ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP, ldFlag;
 	output reg TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR;
 	output reg[2:0] funcSelect;
 	output reg[2:0] regSelect;
@@ -77,6 +77,7 @@ module controller(
 			ldReg = 0;
 			ldYBuff = 0;
 			ldSP = 0;
+			ldFlag = 0;
 			TPC = 0;
 			TSP = 0;
 			TMAR = 0;
@@ -207,6 +208,10 @@ module controller(
 						ldReg = 1;
 						ldReg = 0;
 						TReg = 0;
+						if(!(IR[15:12] == 4'b1111 && IR[11:9] == 3'b001)) begin
+							ldFlag = 1;
+							ldFlag = 0;
+						end
 					end
 					state = 5'b00000;
 				end
@@ -415,8 +420,8 @@ input [15:0] x;
 input [15:0] y;
 output [15:0] z;
 input [2:0] f;
-output reg cy;
-output reg cym1;
+output wire cy;
+output wire cym1;
 
 wire [15:0] incr;
 wire [15:0] orop;
