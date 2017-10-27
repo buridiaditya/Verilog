@@ -5,10 +5,11 @@ module testbench();
 
 	reg status, MFC, reset, clock;
 	wire read, write;
-	wire ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP;
+	wire ldMAR, ldMDR, ldIR, ldPC, ldReg, ldYBuff, ldSP, ldFlag;
 	wire TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite;
 	wire[2:0] funcSelect;
 	wire[2:0] regSelect;
+	wire[3:0] statusSelect;
 
 	initial begin
 		$dumpfile ("shifter.vcd");
@@ -31,18 +32,18 @@ module testbench();
 	always begin
 		#5 clock = ~clock;
 	end 
-	always @(posedge ldIR) begin
-		IRout = IR[i];
-		i = i+1;
-		if(i > 4)
-			i = 4;
-	end
+	// always @(posedge ldIR) begin
+	// 	IRout = IR[i];
+	// 	i = i+1;
+	// 	if(i > 4)
+	// 		i = 4;
+	// end
 	controller a(
 	IRout, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
-	ldPC, ldReg, ldYBuff, ldSP,
+	ldPC, ldReg, ldYBuff, ldSP, ldFlag,
 	TPC, TSP, TMAR, TMDR, TDBUS, TReg, TALU, TIR, TWrite,
-	funcSelect, regSelect, read, write
+	funcSelect, regSelect, statusSelect, read, write
 	);
 endmodule
 
@@ -86,6 +87,7 @@ module controller(
 			TReg = 0;
 			TALU = 0;
 			TIR = 0;
+			TWrite = 0;
 		end
 		else begin
 			case(state)
