@@ -320,6 +320,8 @@ module controller(
 					ldMDR = 1;
 					ldMDR = 0;
 					TALU = 0;
+					TReg = 0;
+					TPC = 0;
 					write = 1;
 					TWrite = 1;
 					state = 5'b01110;
