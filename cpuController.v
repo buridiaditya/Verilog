@@ -1,4 +1,4 @@
-module testbench();
+/*module testbench();
 	reg[15:0] IR[0:4];
 	integer i = 0;
 	reg[15:0] IRout;
@@ -46,7 +46,7 @@ module testbench();
 	funcSelect, regSelect, statusSelect, read, write
 	);
 endmodule
-
+*/
 module controller(
 	IR, status, MFC, reset, clock,
 	ldMAR, ldMDR, ldIR, 
@@ -329,13 +329,13 @@ assign tempIR = {4'b0,IR[11:0]};
 triStateBuffer BuffIR(TIR,tempIR,INBUS);
 
 register16bit MDR(fromMDR ,toMDR,1,reset,ldMDR);
-triStateBuffer(TALU,OUTBUS,toMDR);
-triStateBuffer(TDBus,DBUS,toMDR);
-triStateBuffer(TMDR,fromMDR,INBUS);
-triStateBuffer(TWrite,fromMDR,DBUS);
+triStateBuffer s1(TALU,OUTBUS,toMDR);
+triStateBuffer s2(TDBus,DBUS,toMDR);
+triStateBuffer s3(TMDR,fromMDR,INBUS);
+triStateBuffer s4(TWrite,fromMDR,DBUS);
 
 
-register16bit SP(Osp,OUTBUS,1,reset,ldSP);
+register16bitSP SP(Osp,OUTBUS,1,reset,ldSP);
 triStateBuffer BuffSP(TSP,Osp,INBUS);
 
 register16bit PC(Opc,OUTBUS,1,reset,ldPC);
@@ -347,9 +347,9 @@ triStateBuffer BuffRegBank(TReg,Oregbank,INBUS);
 register16bit Ybuff(yout,INBUS,1,reset,ldYbuff);
 
 
-ALU(INBUS,yout,OUTBUS,FnSelect,cy,cym1);
-statusDetect(cy,cym1,OUTBUS,z,nz,v,nv,c,nc,s,ns,ldflg,reset);
-statusConditionSelection(z,nz,v,nv,c,nc,s,ns,CondSelect,status);
+ALU alumod(INBUS,yout,OUTBUS,FnSelect,cy,cym1);
+statusDetect sd(cy,cym1,OUTBUS,z,nz,v,nv,c,nc,s,ns,ldflg,reset);
+statusConditionSelection scs(z,nz,v,nv,c,nc,s,ns,CondSelect,status);
 
 endmodule
 
@@ -358,6 +358,25 @@ module triStateBuffer(enable,inp,out);
     input enable;
     output[15:0] out;
     assign out = enable?inp:'bz;
+endmodule
+
+module register16bitSP(out, in, e, reset, clock);
+    output [15:0] out;
+    input [15:0] in;
+    input e;
+    input reset;
+    input clock;
+     (*keep = "true"*) reg [15:0] mem;
+    
+    always @(posedge clock) 
+    begin 
+      if (reset) 
+        mem <= 16'b0000000000001010; 
+      else if (e) 
+        mem <= in; 
+    end 
+    
+    assign out = mem;
 endmodule
 
 module register16bit(out, in, e, reset, clock);
@@ -431,7 +450,7 @@ module regBank(dataIn, dataOut, regselect, reset, clock);
     register16bit r7(out7, dataIn, e7, reset, clock);
     register16bit r8(out8, dataIn, e8, reset, clock);
    
-    bit16_mux_8to1(dataOut,out1,out2,out3,out4,out5,out6,out7,out8,{regselect[2],regselect[1],regselect[0]}); 
+    bit16_mux_8to1 mu(dataOut,out1,out2,out3,out4,out5,out6,out7,out8,{regselect[2],regselect[1],regselect[0]}); 
     
 endmodule
 
@@ -639,4 +658,88 @@ output status;
 
 mux9to1 m({z,nz,v,nv,s,ns,1},condition,status);
 endmodule 
+
+module testbenchCPU();
+    reg[15:0] mem[0:19];
+	integer i = 0;
+
+	wire [15:0] ABUS;
+	wire [15:0] DBUS;
+	wire [15:0] data;
+	reg reset;
+	reg clock,MFC;
+	wire read,write;
+	
+
+	initial begin
+		$dumpfile ("shifter.vcd");
+		$dumpvars;
+		MFC = 1;
+		#10 reset = 1;
+		#15 reset = 0;
+		mem[0] = 16'b1111001001000000;
+		mem[1] = 16'b1111010001000000;
+		mem[2] = 16'b1111011010000000;
+		mem[3] = 16'b1111000010000000;
+		mem[4] = 16'b1111010001000000;
+		mem[5] = 16'b1111010001000000;
+		mem[6] = 16'b1111010001000000;
+		mem[7] = 16'b1010000000000000;
+        mem[10]= 16'b0000000000000001;
+        mem[11]= 16'b0000000000000001;
+        mem[12]= 16'b0000000000000001; 
+	end
+	
+	always begin
+		#5 clock = ~clock;
+	end 
+	
+	always begin
+        if(read || write) begin
+            MFC = 0;
+            #3 MFC = 1;
+        end
+    end 
+    
+    always @(*) begin 
+        if(write == 1) begin
+            mem[ABUS] = DBUS;        
+        end
+    end
+	assign data = mem[ABUS];
+	
+	triStateBuffer tsb(read,data,DBUS);
+	
+	
+     CPU cputest(ABUS,DBUS,reset,clock,MFC,read,write);
+    
+endmodule
+
+
+module CPU(ABUS,DBUS,reset,clock,MFC,read,write);
+input [15:0] ABUS;
+inout [15:0] DBUS;
+input reset;
+input clock;
+input MFC;
+output read,write;
+
+wire ldSP,TSP,ldPC,TPC,TReg,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,TWrite,ldMAR,ldflg,status,ldReg;
+wire[15:0] IR;
+wire [2:0] FnSelect; 
+wire [2:0] RegSel;
+wire [3:0] CondSelect;
+
+controller cntrlr(
+	IR, status, MFC, reset, clock,
+	ldMAR, ldMDR, ldIR, 
+	ldPC, ldReg, ldYbuff, ldSP, ldflg,
+	TPC, TSP, TMAR, TMDR, TDBus, TReg, TALU, TIR, TWrite,
+	FnSelect, RegSel,  CondSelect, read, write
+	);
+
+datapath dtpth(ldSP,TSP,ldPC,TPC,RegSel,TReg,FnSelect,ldYbuff,ldIR,TIR,TMDR,ldMDR,TALU,TDBus,TMAR,TWrite,ldMAR,ldflg,
+                CondSelect,status,IR,ldReg,reset,ABUS,DBUS);
+
+endmodule
 
