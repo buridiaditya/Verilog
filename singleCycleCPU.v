@@ -1,3 +1,49 @@
+module testbench();
+	reg[15:0] mem[0:19];
+	reg clock, status, reset;
+	integer i = 0;
+	wire ldReg, ldPC, ldSP, read, write;
+	wire S1,S2,S3,S4,S5,S6,S7;
+	wire[2:0] functionSelect;
+
+	initial begin
+		$dumpfile ("shifter.vcd");
+		$dumpvars;
+		clock = 0;
+		status = 0;
+		i = -1;
+		mem[0] = 16'b0000000100000000; // PUSH
+		mem[1] = 16'b0000100100000000;	// POP
+		mem[2] = 16'b0001000100000000;	// ADD
+		mem[3] = 16'b0001100100000000;	// NEG
+		mem[4] = 16'b0010000100000000;	// OR
+		mem[5] = 16'b0010100100000000;	// NOT
+		mem[6] = 16'b0011000000000000;	// CALL
+		mem[7] = 16'b0011100000000000;	// RETURN
+		mem[17]= 16'b0000000000000010;
+		mem[18]= 16'b0000000000000100;
+		mem[19]= 16'b0000000000000001;  
+		#10 reset = 1;
+		#23 reset = 0;
+	end
+
+	always begin
+		#5 clock = ~clock;
+	end 
+	
+	always @(posedge ldPC) begin
+		i = i+1;
+		if(i > 7) begin
+			i = 7;
+		end
+	end
+
+	controller m1(
+	status,clock, reset,mem[i], read, write,
+	ldReg,ldPC,ldSP,S1,	S2,	S3, S4, S5,	S6, S7, functionSelect ); 
+
+endmodule
+
 module controller(
 	status,clock, reset,IR[15:0], read, write,
 	ldReg,ldPC,ldSP,
@@ -13,24 +59,26 @@ module controller(
 	input[15:0] IR;
 	output wire ldReg, ldPC, ldSP, read, write;
 	output wire S1,S2,S3,S4,S5,S6,S7;
-	output wire functionSelect;
+	output wire[2:0] functionSelect;
 	reg state;
 
 	assign ldReg = ( (state) && ( ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) );
-	assign ldSP = ( (state) &&  (|(IR[15:11] ^ 5'b00000)) ;
+	assign ldSP =  (state) &&  (|(IR[15:11] ^ 5'b00000)) ;
 	assign ldPC = (state);
-	assign write = (state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)));
+	assign write = (state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)) );
 	assign read = ~write;
-	assign S1 = (~state) && ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
-	assign S2 = (~state) && ( |(IR[15:11] ^ 5'b00110) );
-	assign S3 = (~state) && ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
-	assign S4 = (~state) && ( |(IR[15:14] ^ 2'b00) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) );
+	assign S1 = ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
+	assign S2 = ( |(IR[15:11] ^ 5'b00110) );
+	assign S3 = ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
+	assign S4 = ( |(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) );
 	assign S5 = S4;
-	assign S6 = (~state) && ( |(IR[15:14] ^ 2'b00) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) && |(IR[15:11] ^ 5'b00111) );
-	assign S7 = (~state) && ( ~(|(IR[15:14] ^ 2'b00)) && ~(|(IR[15:14] ^ 2'b10)) && ~(|(IR[15:11] ^ 5'b00110)) )
+	assign S6 = ( |(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) && |(IR[15:11] ^ 5'b00111) );
+	assign S7 = ( ~(|(IR[15:14] ^ 2'b01)) || ~(|(IR[15:14] ^ 2'b10)) || ~(|(IR[15:11] ^ 5'b00110)) );
+	assign functionSelect[2] = ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00111));
+	assign functionSelect[1] = ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101));
+	assign functionSelect[0] = ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00101));
 
-
-	always @( posedge clock or negedge clock ) begin
+	always @(posedge clock or negedge clock) begin
 		if(reset == 1) begin
 			state = 0;
 		end
@@ -44,7 +92,8 @@ module controller(
 		end
 	end
 endmodule
-		     
+
+	/*	     
 module datapath(ldPC,ldFlg,ldSp,ldRegBank,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,reset);
     input ldPC,ldFlg,ldSp,ldRegBank,s1,s2,s3,s4,s5,s6,s7,reset;
     input [2:0] funcSel;
@@ -397,3 +446,4 @@ module statusConditionSelection(z,nz,v,nv,c,nc,s,ns,condition,status);
 
 	mux9to1 m({z,nz,v,nv,c,nc,s,ns,1'b1},condition,status);
 endmodule 
+*/
