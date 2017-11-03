@@ -6,21 +6,31 @@ module controller(
 	S3, // M - Address Bus {sp, sp-updated}
 	S4, // ALU - YBus {MemOut, PC + 4}
 	S5,	// ALU - XBus {RegOut, Label}
-	S6, S7 // PC - Update {PC + 4, PC + 4 + Label, M[SP]} 
+	S6, S7, // PC - Update {PC + 4, PC + 4 + Label, M[SP]}
+	functionSelect 
 	); 
 	input status, clock, reset;
 	input[15:0] IR;
 	output wire ldReg, ldPC, ldSP, read, write;
 	output wire S1,S2,S3,S4,S5,S6,S7;
+	output wire functionSelect;
 	reg state;
 
 	assign ldReg = ( (state) && ( ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) );
-	assign ldSP = ( (state) && ( (|(IR[15:11] ^ 5'b00000)) );
+	assign ldSP = ( (state) &&  (|(IR[15:11] ^ 5'b00000)) ;
 	assign ldPC = (state);
 	assign write = (state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)));
 	assign read = ~write;
-	assign S1 = (~state) && ;
-	always @( (posedge clock) || (negedge clock) ) begin
+	assign S1 = (~state) && ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
+	assign S2 = (~state) && ( |(IR[15:11] ^ 5'b00110) );
+	assign S3 = (~state) && ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
+	assign S4 = (~state) && ( |(IR[15:14] ^ 2'b00) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) );
+	assign S5 = S4;
+	assign S6 = (~state) && ( |(IR[15:14] ^ 2'b00) && |(IR[15:14] ^ 2'b10) && |(IR[15:11] ^ 5'b00110) && |(IR[15:11] ^ 5'b00111) );
+	assign S7 = (~state) && ( ~(|(IR[15:14] ^ 2'b00)) && ~(|(IR[15:14] ^ 2'b10)) && ~(|(IR[15:11] ^ 5'b00110)) )
+
+
+	always @( posedge clock or negedge clock ) begin
 		if(reset == 1) begin
 			state = 0;
 		end
@@ -29,7 +39,7 @@ module controller(
 				state = 0;
 			end
 			else begin
-				state == 1;
+				state = 1;
 			end
 		end
 	end
