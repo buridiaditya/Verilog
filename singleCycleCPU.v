@@ -1,5 +1,6 @@
 module testbench();
-	reg[15:0] mem[0:19];
+	reg[15:0] memIR[0:19];
+	reg[15:0] memData[0:19];
 	reg clock, status, reset;
 	integer i = 0;
 	wire ldReg, ldPC, ldSP, read, write;
@@ -12,17 +13,29 @@ module testbench();
 		clock = 0;
 		status = 0;
 		i = -1;
-		mem[0] = 16'b0000000100000000; // PUSH
-		mem[1] = 16'b0000100100000000;	// POP
-		mem[2] = 16'b0001000100000000;	// ADD
-		mem[3] = 16'b0001100100000000;	// NEG
-		mem[4] = 16'b0010000100000000;	// OR
-		mem[5] = 16'b0010100100000000;	// NOT
-		mem[6] = 16'b0011000000000000;	// CALL
-		mem[7] = 16'b0011100000000000;	// RETURN
-		mem[17]= 16'b0000000000000010;
-		mem[18]= 16'b0000000000000100;
-		mem[19]= 16'b0000000000000001;  
+		memIR[0] = 16'b0000000100000000; // PUSH
+		memIR[1] = 16'b0000100100000000;	// POP
+		memIR[2] = 16'b0001000100000000;	// ADD
+		memIR[3] = 16'b0001100100000000;	// NEG
+		memIR[4] = 16'b0010000100000000;	// OR
+		memIR[5] = 16'b0010100100000000;	// NOT
+		memIR[6] = 16'b0011000000000000;	// CALL
+		memIR[7] = 16'b0011100000000000;	// RETURN
+		memIR[17]= 16'b0000000000000010;
+		memIR[18]= 16'b0000000000000100;
+		memIR[19]= 16'b0000000000000001;  
+		
+		memData[0] = 16'b0000000100000000; 
+		memData[1] = 16'b0000100100000000;	
+		memData[2] = 16'b0001000100000000;	
+		memData[3] = 16'b0001100100000000;	
+		memData[4] = 16'b0010000100000000;	
+		memData[5] = 16'b0010100100000000;	
+		memData[6] = 16'b0011000000000000;	
+		memData[7] = 16'b0011100000000000;	
+		memData[17]= 16'b0000000000000010;
+		memData[18]= 16'b0000000000000100;
+		memData[19]= 16'b0000000000000001; 
 		#10 reset = 1;
 		#23 reset = 0;
 	end
@@ -39,7 +52,7 @@ module testbench();
 	end
 
 	controller m1(
-	status,clock, reset,mem[i], read, write,
+	status,clock, reset,memIR[i], read, write,
 	ldReg,ldPC,ldSP,S1,	S2,	S3, S4, S5,	S6, S7, functionSelect ); 
 
 endmodule
@@ -93,6 +106,42 @@ module controller(
 	end
 endmodule
 
+module instructionMemory(PC,dataOut,load,dataIn,reset);
+	input[15:0] PC;
+	input load;
+	input reset;
+	input[15:0] dataIn;
+	output wire[15:0]  dataOut;
+	reg[0:50] memory;
+
+	assign dataOut = memory[PC];
+	always @(posedge load) begin
+		if(reset == 1) begin
+			memory[PC] = 16'b0;
+		end
+		memory[PC] = dataIn;
+	end
+
+endmodule
+
+module dataMemory(Addr,dataOut,load,dataIn,reset);
+	input[15:0] Addr;
+	input load;
+	input reset;
+	input[15:0] dataIn;
+	output wire[15:0]  dataOut;
+	reg[0:50] memory;
+
+	assign dataOut = memory[Addr];
+	always @(posedge load) begin
+		if(reset == 1) begin
+			memory[Addr] = 16'b0;
+		end
+		memory[Addr] = dataIn;
+	end
+
+endmodule
+
 	/*	     
 module datapath(ldPC,ldFlg,ldSp,ldRegBank,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,reset);
     input ldPC,ldFlg,ldSp,ldRegBank,s1,s2,s3,s4,s5,s6,s7,reset;
@@ -105,7 +154,7 @@ module datapath(ldPC,ldFlg,ldSp,ldRegBank,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condit
     
     register16bitPC PC(outPC, inPC, 1'b1, reset, ldPC);
     //instructionMemory 
-
+	
 endmodule
 
 module triStateBuffer(enable,inp,out);
