@@ -1,4 +1,5 @@
-module testbench();
+/*module testbench();
+
 	reg[15:0] memIR[0:19];
 	reg[15:0] memData[0:19];
 	reg clock, status, reset;
@@ -7,7 +8,9 @@ module testbench();
 	wire S1,S2,S3,S4,S5,S6,S7;
 	wire[2:0] functionSelect;
 	wire[3:0] statusSelect;
+
 	initial begin
+
 		$dumpfile ("shifter.vcd");
 		$dumpvars;
 		clock = 0;
@@ -54,6 +57,38 @@ module testbench();
 	controller m1(
 	statusSelect, status,clock, reset,memIR[i], read, write,
 	ldReg,ldPC,ldSP,ldFlag,S1,	S2,	S3, S4, S5,	S6, S7, functionSelect ); 
+
+endmodule*/
+
+module testbench();
+
+	reg clock,reset,loadMem;
+	reg[15:0] dataInstrIn;
+
+	initial begin
+		clock = 0;	
+		reset = 1;
+		#5 reset = 0;
+		dataInstrIn = 16'b0000000000000001;
+		loadMem = 1;
+		loadMem = 0;
+		dataInstrIn = 16'b0000000000000001;
+		loadMem = 1;
+		loadMem = 0;
+		dataInstrIn = 16'b0000000000000001;
+		loadMem = 1;
+		loadMem = 0;
+		dataInstrIn = 16'b0000000000000001;
+		loadMem = 1;
+		loadMem = 0;
+	end
+
+
+	always begin
+		#5 clock = ~clock;
+	end
+
+	CPU c(loadMem, dataInstrIn, reset, clock);
 
 endmodule
 
@@ -174,16 +209,16 @@ module datapath(ldPC,ldFlg,ldSp,ldRegBank,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,
     wire cy,cym1,z,nz,v,nv,c,nc,s,ns;
     
     register16bitPC PC(outPC, inPC, 1'b1, reset, ldPC);
-    adder PCadd(outPC,3'b100,outPCplus4);
-    instructionMemory(outPC,IR,load,dataInstrIn,reset);
-    regBank RB(ALUz, RegBankOut, IR[10:7] , reset , ldRegBank);
+    adder PCadd(outPC,16'b0000000000000100,outPCplus4);
+    instructionMemory IM(outPC,IR,load,dataInstrIn,reset);
+    regBank RB(ALUz, RegBankOut, IR[10:8] , reset , ldRegBank);
     register16bitSP SP(SPout, SPin, 1'b1 , reset, ldSp);
-    adder ADD(SPout,1'b1,Addout);
-    subtractor SUB(SPout, 1'b1 ,Subout);
+    adder ADD(SPout,16'b0000000000000001,Addout);
+    subtractor SUB(SPout, 16'b0000000000000001 ,Subout);
     _16BitMux2to1 S1(Subout,Addout,s1,SPin);
     _16BitMux2to1 S3(SPin,SPout,s3,S3out);
     _16BitMux2to1 S2(outPC,RegBankOut,s2,S2out);
-    dataMemory DM(s3out,s2out,write,DMout,reset);
+    dataMemory DM(S3out,S2out,write,DMout,reset);
     _16BitMux2to1 S4(outPCplus4,DMout,s4,ALUx);
     _16BitMux2to1 S5({5'b00000,IR[10:0]},RegBankOut,s5,ALUy);
     ALU alu(ALUx,ALUy,ALUz,funcSel,cy,cym1); 
@@ -265,6 +300,23 @@ module register16bitPC(out, in, e, reset, ldSig);
 endmodule
 
 module register16bitSP(out, in, e, reset, ldSig);
+	output [15:0] out;
+	input [15:0] in;
+	input e;
+	input reset;
+	input ldSig;
+	(*keep = "true"*) reg [15:0] mem;
+	always @(posedge ldSig) begin 
+		if (reset == 1) 
+			mem <= 16'b0; 
+		else if (e == 1) 
+			mem <= in; 
+	end 
+	assign out = mem;
+endmodule
+
+
+module register16bit(out, in, e, reset, ldSig);
 	output [15:0] out;
 	input [15:0] in;
 	input e;
@@ -507,15 +559,15 @@ module statusConditionSelection(z,nz,v,nv,c,nc,s,ns,condition,status);
 	mux9to1 m({z,nz,v,nv,c,nc,s,ns,1'b1},condition,status);
 endmodule 
 
-module CPU(loadMem,dataInstrIn);
-    input loadMem;
+module CPU(loadMem,dataInstrIn,reset,clock);
+    input loadMem,clock, reset;
     input [15:0] dataInstrIn;
     
     wire s1,s2,s3,s4,s5,s6,s7,ldFlag,ldSP,ldPC,ldReg,write,read;
     wire [2:0] funcSel;
     wire [15:0] IR;
     wire [3:0] condition;
-    wire status;
+    wire status, reset;
     
     datapath DP(ldPC,ldFlag,ldSP,ldReg,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,reset,status
                     ,loadMem,dataInstrIn);
@@ -523,13 +575,4 @@ module CPU(loadMem,dataInstrIn);
     controller CTRLR(condition, status, clock, reset,IR[15:0], read, write, 
                         ldReg,ldPC,ldSP,ldFlag,
                         s1,s2,s3,s4,s5,s6,s7,funcSel); 
-endmodule
-
-
-module testbench();
-    wire loadMem;
-    wire [15:0] dataInstrIn;
-    
-    CPU(loadMem,dataInstrIn);
-    
 endmodule
