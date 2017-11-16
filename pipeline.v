@@ -1,4 +1,4 @@
-module DFF(q,d,c,reset);
+module DFF1(q,d,c,reset);
     output reg q;
     input d,c,reset;
     
@@ -10,29 +10,121 @@ endmodule
 
 module IF_IDpipe(IR_in,IR_out,clock,reset);
     input clock,reset;
-    input IR_in[15:0];
-    output IR_out[15:0];
+    input [15:0] IR_in;
+    output [15:0] IR_out;
     
     generate
             genvar k;
-            for(k=0;k<16;k=k+1) begin : wer
-                DFF(IR_out[i],IR_in[i],clock,reset);
+            for(k=15;k>=0;k=k-1) begin : wer
+                DFF1 IR(IR_out[k],IR_in[k],clock,reset);
             end
    endgenerate    
 endmodule 
 
-module ID_Mpipe(Write_in,s2in,s3,in,s4in,s5in,FnSelin,);
+module ID_Mpipe(Write_in,Write_out,s2in,s3in,s4in,s5in,FnSelin,ldRegin,s2out,s3out,s4out,s5out,FnSelout,ldRegout,
+                SPin,SPout,SPupdatedin,SPupdatedout,Regdatain,Regdataout,PCin,PCout,labelin,labelout,
+                reset,clock);
     input clock,reset;
-    input IR_in[15:0];
-    output IR_out[15:0];
+    input Write_in,s2in,s3in,s4in,s5in,ldRegin;
+    input [2:0] FnSelin;
+    output s4out,s5out,ldRegout,Write_out,s2out,s3out;
+    output [2:0] FnSelout;
+    input [15:0] SPin;  input [15:0] SPupdatedin;  input [15:0] Regdatain;  input [15:0] PCin;  input [15:0] labelin;
+    output [15:0] SPout;  output [15:0] SPupdatedout;  output [15:0] Regdataout;  output [15:0] PCout;  output [15:0] labelout;
+    
+    DFF1 write(Write_out,Write_in,clock,reset);
+    DFF1 S2(s2out,s2in,clock,reset);
+    DFF1 S3(s3out,s3in,clock,reset);
+    DFF1 S4(s4out,s4in,clock,reset);
+    DFF1 S5(s5out,s5in,clock,reset);
+    DFF1 ldReg(ldRegout,ldRegin,clock,reset);
     
     generate
-            genvar k;
-            for(k=0;k<16;k=k+1) begin : wer
-                DFF(IR_out[i],IR_in[i],clock,reset);
-            end
-   endgenerate    
+                genvar k1;
+                for(k1=2;k1>=0;k1=k1-1) begin : were
+                   DFF1 FnSel(FnSelout[k1],FnSelin[k1],clock,reset);
+                end
+    endgenerate
+       
+    generate
+        genvar k;
+        for(k=15;k>=0;k=k-1) begin : wer
+            DFF1 SP(SPout[k],SPin[k],clock,reset);
+        end
+        
+        for(k=15;k>=0;k=k-1) begin : wer1
+            DFF1 SPupdated(SPupdatedout[k],SPupdatedin[k],clock,reset);
+        end
+        
+        for(k=15;k>=0;k=k-1) begin : wer2
+            DFF1 RegData(Regdataout[k],Regdatain[k],clock,reset);
+        end
+        
+        for(k=15;k>=0;k=k-1) begin : wer3
+            DFF1 PC(PCout[k],PCin[k],clock,reset);
+        end
+        
+        for(k=15;k>=0;k=k-1) begin : wer4
+            DFF1 PC(labelout[k],labelin[k],clock,reset);
+        end
+   endgenerate 
+      
 endmodule 
+
+module M_EXpipe(s4in,s5in,FnSelin,ldRegin,s4out,s5out,FnSelout,ldRegout,PCupdatedin,Memdatain,Regdatain,labelin,PCupdatedout,Memdataout,Regdataout,labelout,clock,reset);
+    input s4in,s5in,ldRegin,clock,reset;
+    input [2:0] FnSelin;
+    output s4out,s5out,ldRegout;
+    output [2:0] FnSelout;
+    input [15:0] PCupdatedin,Memdatain,Regdatain,labelin;
+    output [15:0]  PCupdatedout,Memdataout,Regdataout,labelout;
+    
+    DFF1 S4(s4out,s4in,clock,reset);
+    DFF1 S5(s5out,s5in,clock,reset);
+    DFF1 ldReg(ldRegout,ldRegin,clock,reset);
+    
+    generate
+        genvar k1;
+        for(k1=2;k1>=0;k1=k1-1) begin : were
+            DFF1 FnSel(FnSelout[k1],FnSelin[k1],clock,reset);
+        end
+    endgenerate
+          
+       generate
+           genvar k;
+           for(k=15;k>=0;k=k-1) begin : wer
+               DFF1 PCupdated(PCupdatedout[k],PCupdatedin[k],clock,reset);
+           end
+           
+           for(k=15;k>=0;k=k-1) begin : wer1
+               DFF1 Memdata(Memdataout[k],Memdatain[k],clock,reset);
+           end
+           
+           for(k=15;k>=0;k=k-1) begin : wer2
+               DFF1 RegData(Regdataout[k],Regdatain[k],clock,reset);
+           end
+           
+           for(k=15;k>=0;k=k-1) begin : wer4
+               DFF1 PC(labelout[k],labelin[k],clock,reset);
+           end
+      endgenerate     
+endmodule
+
+module EX_WBpipe(ldRegin,ldRegout,zin,zout,clock,reset);
+    input ldRegin,clock,reset;
+    input [15:0] zin;
+    output ldRegout;
+    output [15:0] zout;
+    
+    DFF1 ldReg(ldRegout,ldRegin,clock,reset);
+    
+     generate
+        genvar k;
+        for(k=15;k>=0;k=k-1) begin : wer
+            DFF1 z(zout[k],zin[k],clock,reset);
+        end
+    endgenerate   
+endmodule
 
 module controller(
 	statusSelect, status, clock, reset,IR[15:0], read, write, 
@@ -117,7 +209,7 @@ module datapath(ldPC,ldFlg,ldSp,ldRegBank,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,
     
     register16bitPC PC(outPC, inPC, 1'b1, reset, ldPC);
     adder PCadd(outPC,16'b0000000000000100,outPCplus4);
-    instructionMemory IM(outPC,IR,load,dataInstrIn,reset);
+    instructionMemory IM(outPC,IR,loadMem,dataInstrIn,reset);
     regBank RB(ALUz, RegBankOut, IR[10:8] , reset , ldRegBank);
     register16bitSP SP(SPout, SPin, 1'b1 , reset, ldSp);
     adder ADD(SPout,16'b0000000000000001,Addout);
