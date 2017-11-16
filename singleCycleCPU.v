@@ -62,39 +62,25 @@ endmodule*/
 
 module testbench();
 
-	reg clock,reset,loadMem;
-	reg[15:0] dataInstrIn;
-
+	reg clock,reset;
 	initial begin
-		clock = 0;	
+		$dumpfile ("shifter.vcd");
+		$dumpvars;
+		clock = 0;
 		reset = 1;
-		#5 reset = 0;
-		dataInstrIn = 16'b0000000000000001;
-		loadMem = 1;
-		loadMem = 0;
-		dataInstrIn = 16'b0000000000000001;
-		loadMem = 1;
-		loadMem = 0;
-		dataInstrIn = 16'b0000000000000001;
-		loadMem = 1;
-		loadMem = 0;
-		dataInstrIn = 16'b0000000000000001;
-		loadMem = 1;
-		loadMem = 0;
+		#15 reset = 0;
 	end
-
-
 	always begin
 		#5 clock = ~clock;
 	end
 
-	CPU c(loadMem, dataInstrIn, reset, clock);
+	CPU c(reset, clock);
 
 endmodule
 
 module controller(
 	statusSelect, status, clock, reset,IR[15:0], read, write, 
-	ldReg,ldPC,ldSP,ldFlag,
+	ldReg,ldPC,ldSP,ldFlag, updateInstruction,
 	S1,	// SP Update {sp+1,sp-1}
 	S2,	// M - Input DBus {Reg, PC}
 	S3, // M - Address Bus {sp, sp-updated}
@@ -106,16 +92,17 @@ module controller(
 	output[3:0] statusSelect;
 	input clock, reset, status;
 	input[15:0] IR;
-	output wire ldReg, ldPC, ldSP, ldFlag, read, write;
+	output wire ldReg, ldPC, ldSP, ldFlag, read, write, updateInstruction;
 	output wire S1,S2,S3,S4,S5,S6,S7;
 	output wire[2:0] functionSelect;
 	reg state;
 
-	assign ldReg = ( (state) && (  ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) );
-	assign ldSP =  (state) &&  (|(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10)) ;
-	assign ldPC = (state);
-	assign ldFlag = (state) && ( ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) ;
-	assign write = (state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)) );
+	assign ldReg = ( (state) && (  ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) ) || (!state && reset);
+	assign ldSP =  ( (state) &&  (|(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10)) ) || (!state && reset);
+	assign ldPC = (state) || (!state && reset) ;
+	assign updateInstruction = (!state && reset);
+	assign ldFlag = ( (state) && ( ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) ) || (!state && reset);
+	assign write = ((state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)) )) || (!state && reset);
 	assign read = ~write;
 	assign S1 = ( |(IR[15:11] ^ 5'b00000) && |(IR[15:11] ^ 5'b00110) );
 	assign S2 = ( |(IR[15:11] ^ 5'b00110) );
@@ -146,20 +133,25 @@ module controller(
 
 endmodule
 
-module instructionMemory(PC,dataOut,load,dataIn,reset);
+module instructionMemory(PC,dataOut,load ,reset);
 	input[15:0] PC;
 	input load;
 	input reset;
-	input[15:0] dataIn;
+	
 	output wire[15:0]  dataOut;
-	reg[0:50] memory;
+	reg[15:0] memory[0:63];
 
 	assign dataOut = memory[PC];
+
 	always @(posedge load) begin
 		if(reset == 1) begin
-			memory[PC] = 16'b0;
+			memory[0] = 16'b0000100100000000;
+			memory[1] = 16'b0001000100000000;
+			memory[2] = 16'b0001101000000000;
+			memory[3] = 16'b0000001000000000;
+			memory[4] = 16'b0001000100000000;
+			memory[5] = 16'b0000000100000000;
 		end
-		memory[PC] = dataIn;
 	end
 
 endmodule
@@ -170,12 +162,14 @@ module dataMemory(Addr,dataOut,load,dataIn,reset);
 	input reset;
 	input[15:0] dataIn;
 	output wire[15:0]  dataOut;
-	reg[0:50] memory;
+	reg[15:0] memory[0:63];
 
 	assign dataOut = memory[Addr];
 	always @(posedge load) begin
 		if(reset == 1) begin
-			memory[Addr] = 16'b0;
+			memory[63] = 16'b0000000000000001;
+			memory[62] = 16'b0000000000000100;
+			memory[61] = 16'b0000000000000010;
 		end
 		memory[Addr] = dataIn;
 	end
@@ -183,14 +177,12 @@ module dataMemory(Addr,dataOut,load,dataIn,reset);
 endmodule
 
 module datapath(ldPC,ldFlg,ldSp,ldRegBank,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,
-                reset,status,loadMem,dataInstrIn);
-    input ldPC,ldFlg,ldSp,ldRegBank,s1,s2,s3,s4,s5,s6,s7,reset,write;
+                reset,status, updateInstruction);
+    input ldPC,ldFlg,ldSp,ldRegBank,s1,s2,s3,s4,s5,s6,s7,reset,write,updateInstruction;
     input [2:0] funcSel;
     output [15:0] IR;
     input [3:0] condition;
     output status;
-    input loadMem;
-    input [15:0] dataInstrIn;
     
     wire [15:0] inPC;
     wire [15:0] outPC;
@@ -209,8 +201,8 @@ module datapath(ldPC,ldFlg,ldSp,ldRegBank,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,
     wire cy,cym1,z,nz,v,nv,c,nc,s,ns;
     
     register16bitPC PC(outPC, inPC, 1'b1, reset, ldPC);
-    adder PCadd(outPC,16'b0000000000000100,outPCplus4);
-    instructionMemory IM(outPC,IR,load,dataInstrIn,reset);
+    adder PCadd(outPC,16'b0000000000000001,outPCplus4);
+    instructionMemory IM(outPC,IR, updateInstruction, reset);
     regBank RB(ALUz, RegBankOut, IR[10:8] , reset , ldRegBank);
     register16bitSP SP(SPout, SPin, 1'b1 , reset, ldSp);
     adder ADD(SPout,16'b0000000000000001,Addout);
@@ -218,7 +210,7 @@ module datapath(ldPC,ldFlg,ldSp,ldRegBank,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,
     _16BitMux2to1 S1(Subout,Addout,s1,SPin);
     _16BitMux2to1 S3(SPin,SPout,s3,S3out);
     _16BitMux2to1 S2(outPC,RegBankOut,s2,S2out);
-    dataMemory DM(S3out,S2out,write,DMout,reset);
+    dataMemory DM(S3out,DMout,write,S2out,reset);
     _16BitMux2to1 S4(outPCplus4,DMout,s4,ALUx);
     _16BitMux2to1 S5({5'b00000,IR[10:0]},RegBankOut,s5,ALUy);
     ALU alu(ALUx,ALUy,ALUz,funcSel,cy,cym1); 
@@ -262,12 +254,12 @@ module _16BitMux2to1(inp1,inp2,enable,out);
 	assign out = enable?inp2:inp1;
 endmodule
 
-module triStateBuffer(enable,inp,out);
-	input[15:0] inp;
-	input enable;
-	output[15:0] out;
-	assign out = enable?inp:'bz;
-endmodule
+// module triStateBuffer(enable,inp,out);
+// 	input[15:0] inp;
+// 	input enable;
+// 	output[15:0] out;
+// 	assign out = enable?inp:'bz;
+// endmodule
 
 module adder(inp1,inp2,outp);
     input [15:0] inp1;
@@ -308,7 +300,7 @@ module register16bitSP(out, in, e, reset, ldSig);
 	(*keep = "true"*) reg [15:0] mem;
 	always @(posedge ldSig) begin 
 		if (reset == 1) 
-			mem <= 16'b0; 
+			mem <= 16'b0000000000111101; 
 		else if (e == 1) 
 			mem <= in; 
 	end 
@@ -559,9 +551,8 @@ module statusConditionSelection(z,nz,v,nv,c,nc,s,ns,condition,status);
 	mux9to1 m({z,nz,v,nv,c,nc,s,ns,1'b1},condition,status);
 endmodule 
 
-module CPU(loadMem,dataInstrIn,reset,clock);
-    input loadMem,clock, reset;
-    input [15:0] dataInstrIn;
+module CPU(reset,clock);
+    input clock, reset;
     
     wire s1,s2,s3,s4,s5,s6,s7,ldFlag,ldSP,ldPC,ldReg,write,read;
     wire [2:0] funcSel;
@@ -569,10 +560,9 @@ module CPU(loadMem,dataInstrIn,reset,clock);
     wire [3:0] condition;
     wire status, reset;
     
-    datapath DP(ldPC,ldFlag,ldSP,ldReg,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,reset,status
-                    ,loadMem,dataInstrIn);
+    datapath DP(ldPC,ldFlag,ldSP,ldReg,write,funcSel,s1,s2,s3,s4,s5,s6,s7,IR,condition,reset,status, updateInstruction);
                     
     controller CTRLR(condition, status, clock, reset,IR[15:0], read, write, 
-                        ldReg,ldPC,ldSP,ldFlag,
+                        ldReg,ldPC,ldSP,ldFlag, updateInstruction,
                         s1,s2,s3,s4,s5,s6,s7,funcSel); 
 endmodule
