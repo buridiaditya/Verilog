@@ -68,7 +68,7 @@ module testbench();
 		$dumpvars;
 		clock = 0;
 		reset = 1;
-		#15 reset = 0;
+		#12 reset = 0;
 	end
 	always begin
 		#5 clock = ~clock;
@@ -99,7 +99,7 @@ module controller(
 
 	assign ldReg = ( (state) && (  ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) ) || (!state && reset);
 	assign ldSP =  ( (state) &&  (|(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10)) ) || (!state && reset);
-	assign ldPC = (state) || (!state && reset) ;
+	assign ldPC = (!state);
 	assign updateInstruction = (!state && reset);
 	assign ldFlag = ( (state) && ( ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101)) ) ) || (!state && reset);
 	assign write = ((state) && ( ~(|(IR[15:11] ^ 5'b00000)) || ~(|(IR[15:11] ^ 5'b00110)) )) || (!state && reset);
@@ -111,9 +111,13 @@ module controller(
 	assign S5 = S4;
 	assign S6 = ( ( |(IR[15:14] ^ 2'b01) && |(IR[15:14] ^ 2'b10) ) && |(IR[15:11] ^ 5'b00110) && |(IR[15:11] ^ 5'b00111) ) || (( ~(|(IR[15:14] ^ 2'b01)) || ~(|(IR[15:14] ^ 2'b10)) ) && ~status);
 	assign S7 = ( ( ( ~(|(IR[15:14] ^ 2'b01)) || ~(|(IR[15:14] ^ 2'b10)) ) && status ) || ~(|(IR[15:11] ^ 5'b00110)) );
-	assign functionSelect[2] = ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00111));
-	assign functionSelect[1] = ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101));
+	// assign functionSelect[2] = ~(|(IR[15:11] ^ 5'b00001)) || ~(|(IR[15:11] ^ 5'b00111));
+	// assign functionSelect[1] = ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101));
+	// assign functionSelect[0] = ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00101));
+	assign functionSelect[2] = ~(|(IR[15:11] ^ 5'b00100)) || ~(|(IR[15:11] ^ 5'b00101));
+	assign functionSelect[1] = ~(|(IR[15:11] ^ 5'b00010)) || ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00110)) || (~(|(IR[15:14] ^ 2'b01)) || ~(|(IR[15:14] ^ 2'b10)));
 	assign functionSelect[0] = ~(|(IR[15:11] ^ 5'b00011)) || ~(|(IR[15:11] ^ 5'b00101));
+
 	assign statusSelect = IR[14:11];
 
 
